@@ -1,0 +1,203 @@
+-- All the Mods 10: Item Transfer Between Inventories Script
+-- Compatible with ComputerCraft and various storage mods
+-- Supports: Chests, Barrels, ME Systems, EnderIO, Industrial Foregoing, etc.
+
+-- Configuration
+local CONFIG = {
+    verbose = true,
+    maxRetries = 3,
+    itemsPerTransfer = 64
+}
+
+-- Helper functions
+local function log(message)
+    if CONFIG.verbose then
+        print("[ATM10] " .. tostring(message))
+    end
+end
+
+local function logError(message)
+    print("[ERROR] " .. tostring(message))
+end
+
+-- Find connected peripherals
+local function findInventories()
+    local inventories = {}
+    for _, side in ipairs(rs.getSides()) do
+        if peripheral.isPresent(side) then
+            local periph = peripheral.getType(side)
+            if periph == "chest" or periph == "barrel" or periph == "me_storage" or 
+               periph == "ironchest" or periph == "refined_storage" or string.find(periph, "inventory") then
+                inventories[side] = peripheral.wrap(side)
+                log("Found inventory on side: " .. side .. " (Type: " .. periph .. ")")
+            end
+        end
+    end
+    return inventories
+end
+
+-- Get item count in inventory
+local function getItemCount(inventory, itemName, metadata)
+    if not inventory then return 0 end
+    
+    if inventory.list then
+        local count = 0
+        for slot, item in pairs(inventory.list()) do
+            if item.name == itemName and (not metadata or item.metadata == metadata) then
+                count = count + item.count
+            end
+        end
+        return count
+    end
+    return 0
+end
+
+-- Transfer items from source to destination
+local function transferItems(sourceInv, sourceSlot, destInv, count)
+    if not sourceInv or not destInv then
+        logError("Invalid inventory reference")
+        return false
+    end
+    
+    local retries = 0
+    while retries < CONFIG.maxRetries do
+        local success = pcall(function()
+            sourceInv.pushItems(sourceSlot, count)
+        end)
+        
+        if success then
+            log("Transferred " .. count .. " items")
+            return true
+        end
+        
+        retries = retries + 1
+        sleep(0.5)
+    end
+    
+    logError("Failed to transfer items after " .. CONFIG.maxRetries .. " attempts")
+    return false
+end
+
+-- Move all items of a specific type
+local function moveItemsByName(sourceInvSide, destInvSide, itemName)
+    local sourceInv = peripheral.wrap(sourceInvSide)
+    local destInv = peripheral.wrap(destInvSide)
+    
+    if not sourceInv or not destInv then
+        logError("Could not wrap inventories")
+        return false
+    end
+    
+    log("Moving all '" .. itemName .. "' from " .. sourceInvSide .. " to " .. destInvSide)
+    
+    local itemsList = sourceInv.list()
+    local movedCount = 0
+    
+    for slot, item in pairs(itemsList) do
+        if item.name == itemName then
+            local toMove = math.min(item.count, CONFIG.itemsPerTransfer)
+            if sourceInv.pushItems(string.find(destInvSide, "^up") and "down" or destInvSide, slot, toMove) then
+                movedCount = movedCount + toMove
+                log("Slot " .. slot .. ": Moved " .. toMove .. " items")
+            end
+        end
+    end
+    
+    log("Total moved: " .. movedCount .. " items")
+    return movedCount > 0
+end
+
+-- Move all items from source to destination
+local function moveAllItems(sourceInvSide, destInvSide)
+    local sourceInv = peripheral.wrap(sourceInvSide)
+    local destInv = peripheral.wrap(destInvSide)
+    
+    if not sourceInv or not destInv then
+        logError("Could not wrap inventories")
+        return false
+    end
+    
+    log("Moving ALL items from " .. sourceInvSide .. " to " .. destInvSide)
+    
+    local itemsList = sourceInv.list()
+    local movedCount = 0
+    local initialCount = 0
+    
+    for slot, item in pairs(itemsList) do
+        initialCount = initialCount + item.count
+    end
+    
+    for slot, item in pairs(itemsList) do
+        local toMove = item.count
+        while toMove > 0 do
+            local moveAmount = math.min(toMove, CONFIG.itemsPerTransfer)
+            if sourceInv.pushItems(destInvSide, slot, moveAmount) then
+                movedCount = movedCount + moveAmount
+                toMove = toMove - moveAmount
+            else
+                toMove = 0
+            end
+        end
+    end
+    
+    log("Moved " .. movedCount .. " / " .. initialCount .. " items")
+    return true
+end
+
+-- Interactive menu
+local function showMenu()
+    print("\n=== All the Mods 10 Item Mover ===")
+    print("1. List available inventories")
+    print("2. Move all items between two inventories")
+    print("3. Move specific item type")
+    print("4. Exit")
+    print("=====================================")
+    write("Choose option: ")
+end
+
+-- Main program
+local function main()
+    log("Starting Item Transfer Script")
+    
+    while true do
+        showMenu()
+        local choice = io.read()
+        
+        if choice == "1" then
+            local invs = findInventories()
+            if next(invs) == nil then
+                print("No inventories found!")
+            else
+                print("\nAvailable inventories:")
+                for side, inv in pairs(invs) do
+                    print("  - " .. side)
+                end
+            end
+            
+        elseif choice == "2" then
+            write("Source inventory side: ")
+            local source = io.read()
+            write("Destination inventory side: ")
+            local dest = io.read()
+            moveAllItems(source, dest)
+            
+        elseif choice == "3" then
+            write("Source inventory side: ")
+            local source = io.read()
+            write("Destination inventory side: ")
+            local dest = io.read()
+            write("Item name (e.g., minecraft:diamond): ")
+            local itemName = io.read()
+            moveItemsByName(source, dest, itemName)
+            
+        elseif choice == "4" then
+            log("Exiting...")
+            break
+        else
+            print("Invalid option!")
+        end
+    end
+end
+
+-- Run the program
+main()
