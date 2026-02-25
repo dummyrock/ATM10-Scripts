@@ -1,6 +1,6 @@
 -- All the Mods 10: Item Transfer Between Inventories Script
 -- Compatible with ComputerCraft and various storage mods
--- Supports: Chests, Barrels, ME Systems, EnderIO, Industrial Foregoing, etc.
+-- Supports Chests, Barrels, ME Systems, EnderIO, Industrial Foregoing, etc.
 
 -- Configuration
 local CONFIG = {
@@ -88,7 +88,7 @@ local function moveItemsByName(sourceInvSide, destInvSide, itemName)
         return false
     end
     
-    log("Moving all '" .. itemName .. "' from " .. sourceInvSide .. " to " .. destInvSide)
+    log("Moving all " .. itemName .. " from " .. sourceInvSide .. " to " .. destInvSide)
     
     local itemsList = sourceInv.list()
     local movedCount = 0
@@ -103,7 +103,7 @@ local function moveItemsByName(sourceInvSide, destInvSide, itemName)
         end
     end
     
-    log("Total moved: " .. movedCount .. " items")
+    log("Total moved " .. movedCount .. " items")
     return movedCount > 0
 end
 
